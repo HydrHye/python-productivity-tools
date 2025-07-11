@@ -1,7 +1,7 @@
 import time
 import tkinter as tk
 from tkinter import messagebox
-import pandas as pd # Added for CSV
+import pandas as pd  # Added for CSV
 import os           # Added for CSV
 
 class Stopwatch:
@@ -33,7 +33,7 @@ class Stopwatch:
         self.last_accomplishment_time = 0
         self.accomplishment_count = 0
         self.running = False
-        self.update_timer()
+        self.label.config(text="00:00:00")  # Fix: Instantly update label on reset
         print("Stopwatch reset")
 
     def get_time(self):
@@ -80,7 +80,6 @@ class Stopwatch:
 
         dialog.transient(root)  # Set to be on top of the main window
         dialog.grab_set()  # Ensure all input goes to the dialog
-        
         # Center the dialog on the screen
         root.update_idletasks()  # Update "requested size" from geometry manager
         dialog_width = dialog.winfo_reqwidth()
@@ -106,56 +105,52 @@ class Stopwatch:
             file.write("=" * 40 + "\n")
 
         # 2. Log to CSV
-    csv_path = "structured_worklog_by_session.csv"
-    now = time.localtime()
-    standard_date = time.strftime('%Y-%m-%d', now)
-    day_short = time.strftime('%a', now)
-    pretty_date = time.strftime('%d %B (%a) %Y', now)
-    acc_num = self.accomplishment_count
-    acc_time = time.strftime('%I:%M %p', now)
-    acc_full_text = f"{acc_time}\n{accomplishment}"
+        csv_path = "structured_worklog_by_session.csv"
+        now = time.localtime()
+        standard_date = time.strftime('%Y-%m-%d', now)
+        day_short = time.strftime('%a', now)
+        pretty_date = time.strftime('%d %B (%a) %Y', now)
+        acc_num = self.accomplishment_count
+        acc_time = time.strftime('%I:%M %p', now)
+        acc_full_text = f"{acc_time}\n{accomplishment}"
 
-    # Load or initialize CSV
-    if os.path.exists(csv_path):
-        df = pd.read_csv(csv_path)
-    else:
-        df = pd.DataFrame()
+        # Load or initialize CSV
+        if os.path.exists(csv_path):
+            df = pd.read_csv(csv_path)
+        else:
+            df = pd.DataFrame()
 
-    # If Accomplishment #1, start new session/row
-    if acc_num == 1:
-        row = {
-            "Standard Date": standard_date,
-            "Day": day_short,
-            "Date": pretty_date,
-            f"Accomplishment 1": acc_full_text
-        }
-        # Ensure correct columns exist
-        columns = ["Standard Date", "Day"] + [f"Accomplishment {i}" for i in range(1, 21)] + ["Date"]
-        for col in columns:
-            if col not in row:
-                row[col] = ""
-        df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
-    else:
-        # Update the most recent session row (last row)
-        colname = f"Accomplishment {acc_num}"
-        if colname not in df.columns:
-            df[colname] = ""
-        df.at[df.index[-1], colname] = acc_full_text
+        # If Accomplishment #1, start new session/row
+        if acc_num == 1:
+            row = {
+                "Standard Date": standard_date,
+                "Day": day_short,
+                "Date": pretty_date,
+                f"Accomplishment 1": acc_full_text
+            }
+            # Ensure correct columns exist
+            columns = ["Standard Date", "Day"] + [f"Accomplishment {i}" for i in range(1, 21)] + ["Date"]
+            for col in columns:
+                if col not in row:
+                    row[col] = ""
+            df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
+        else:
+            # Update the most recent session row (last row)
+            colname = f"Accomplishment {acc_num}"
+            if colname not in df.columns:
+                df[colname] = ""
+            df.at[df.index[-1], colname] = acc_full_text
 
-    # Save back to CSV
-    df.to_csv(csv_path, index=False)
+        # Save back to CSV
+        df.to_csv(csv_path, index=False)
 
-def start_stopwatch():
-    stopwatch.start()
+# --- Button Feedback for UX (minimal intrusion) ---
+def button_feedback(btn, color="#ffd700", delay=200):
+    # #ffd700 is bright gold/yellow; 200ms is longer than before for clarity
+    original_color = btn.cget("background")
+    btn.config(background=color, activebackground=color)
+    btn.after(delay, lambda: btn.config(background=original_color, activebackground=original_color))
 
-def pause_stopwatch():
-    stopwatch.pause()
-
-def reset_stopwatch():
-    stopwatch.reset()
-
-def on_closing():
-    root.destroy()
 
 # Setup the GUI
 root = tk.Tk()
@@ -164,17 +159,37 @@ root.title("Stopwatch")
 time_label = tk.Label(root, text="00:00:00", font=("Helvetica", 48))
 time_label.pack(pady=20)
 
-start_button = tk.Button(root, text="Start", command=start_stopwatch, font=("Helvetica", 14))
+start_button = tk.Button(root, text="Start", font=("Helvetica", 14))
 start_button.pack(side=tk.LEFT, padx=20)
 
-pause_button = tk.Button(root, text="Pause", command=pause_stopwatch, font=("Helvetica", 14))
+pause_button = tk.Button(root, text="Pause", font=("Helvetica", 14))
 pause_button.pack(side=tk.LEFT, padx=20)
 
-reset_button = tk.Button(root, text="Reset", command=reset_stopwatch, font=("Helvetica", 14))
+reset_button = tk.Button(root, text="Reset", font=("Helvetica", 14))
 reset_button.pack(side=tk.LEFT, padx=20)
+
+# --- Updated commands to add button feedback ---
+def start_command():
+    button_feedback(start_button)
+    stopwatch.start()
+
+def pause_command():
+    button_feedback(pause_button)
+    stopwatch.pause()
+
+def reset_command():
+    button_feedback(reset_button)
+    stopwatch.reset()
+
+start_button.config(command=start_command)
+pause_button.config(command=pause_command)
+reset_button.config(command=reset_command)
 
 # Create Stopwatch instance
 stopwatch = Stopwatch(time_label)
+
+def on_closing():
+    root.destroy()
 
 # Handle the window closing
 root.protocol("WM_DELETE_WINDOW", on_closing)
